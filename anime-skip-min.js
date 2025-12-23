@@ -1,1 +1,263 @@
-!function(){"use strict";const e="https://api.aniskip.com/v2/skip-times",t="https://api.jikan.moe/v4/anime",i=["op","ed","recap"];function n(e,t=!1){console.log("[UltimateSkip]: "+e),t&&"undefined"!=typeof Lampa&&Lampa.Noty}function a(e,t){if(!e||"object"!=typeof e)return 0;e.segments=e.segments||{},e.segments.skip=e.segments.skip||[];let i=0;return t.forEach((t=>{e.segments.skip.some((e=>e.start===t.start))||(e.segments.skip.push({start:t.start,end:t.end,name:t.name||"Пропустить"}),i++)})),i}async function s(s){let o=s.movie||s.card;if(!o){const e=Lampa.Activity.active();e&&(o=e.movie||e.card)}if(!o)return;const r=o.kinopoisk_id||("kinopoisk"===o.source?o.id:null)||o.kp_id,l=function(e,t=1){if(e.episode||e.e||e.episode_number)return{season:parseInt(e.season||e.s||t),episode:parseInt(e.episode||e.e||e.episode_number)};if(e.playlist&&Array.isArray(e.playlist)){const i=e.url,n=e.playlist.findIndex((e=>e.url&&e.url===i));if(-1!==n){const i=e.playlist[n];return{season:parseInt(i.season||i.s||t),episode:n+1}}}return{season:t,episode:1}}(s,1);let p=l.episode,c=l.season;const d=o.number_of_seasons>0||o.original_name&&!o.original_title;d||(c=1,p=1),n(`Start search for: ${o.title} (S${c} E${p}) [Method: calculated]`),console.log("[UltimateSkip DEBUG] Search Params:",{kpId:r,season:c,episode:p,isSerial:d});const m=(o.original_language||"").toLowerCase(),u="ja"===m||"zh"===m||"cn"===m,g=o.genres&&o.genres.some((e=>16===e.id||e.name&&"animation"===e.name.toLowerCase()));if(u||g){n("Anime criteria matched. Trying AniSkip...");let r=o.original_name||o.original_title||o.name;const l=r?r.replace(/\(\d{4}\)/g,"").replace(/\(TV\)/gi,"").replace(/Season \d+/gi,"").replace(/Part \d+/gi,"").replace(/[:\-]/g," ").replace(/\s+/g," ").trim():"";console.log(`[UltimateSkip DEBUG] Cleaned title: "${l}"`);const d=(o.release_date||o.first_air_date||"0000").slice(0,4),m=await async function(e,i,a){let s=e;i>1&&(s+=" Season "+i);const o=`${t}?q=${encodeURIComponent(s)}&limit=10`;console.log("[UltimateSkip DEBUG] Jikan URL:",o);try{const e=await fetch(o),t=await e.json();if(!t.data||0===t.data.length)return null;if(a&&1===i){const e=t.data.find((e=>{let t=e.year;return!t&&e.aired&&e.aired.from&&(t=e.aired.from.substring(0,4)),String(t)===String(a)}));if(e)return console.log(`[UltimateSkip DEBUG] Found by year (${a}): ${e.title} (ID: ${e.mal_id})`),e.mal_id}if(i>1){const e=[`Season ${i}`,`${i+(i%10==1&&11!==i?"st":i%10==2&&12!==i?"nd":i%10==3&&13!==i?"rd":"th")} Season`,`Season${i}`];console.log("[UltimateSkip DEBUG] Checking titles for keywords:",e);const n=t.data.find((t=>[t.title,t.title_english,...t.title_synonyms||[]].filter(Boolean).map((e=>e.toLowerCase())).some((t=>e.some((e=>t.includes(e.toLowerCase())))))));if(n)return console.log(`[UltimateSkip DEBUG] Found by title keywords: ${n.title} (ID: ${n.mal_id})`),n.mal_id}return console.log(`[UltimateSkip DEBUG] Fallback to first result: ${t.data[0].title} (ID: ${t.data[0].mal_id})`),t.data[0].mal_id}catch(e){return n("Jikan Error: "+e.message),null}}(l,c,d);if(m){console.log(`[UltimateSkip DEBUG] Selected MAL ID: ${m}`);const t=function(e){if(!e||!e.length)return[];const t=[];return e.forEach((e=>{if(!e.interval)return;const i=(e.skipType||e.skip_type||"").toLowerCase();let n="Пропустить";i.includes("op")?n="Опенинг":i.includes("ed")?n="Эндинг":"recap"===i&&(n="Рекап");const a=void 0!==e.interval.startTime?e.interval.startTime:e.interval.start_time,s=void 0!==e.interval.endTime?e.interval.endTime:e.interval.end_time;void 0!==a&&void 0!==s&&t.push({start:a,end:s,name:n})})),t}(await async function(t,n){const a=i.map((e=>"types="+e));a.push("episodeLength=0");const s=`${e}/${t}/${n}?${a.join("&")}`;console.log("[UltimateSkip DEBUG] AniSkip URL:",s);try{const e=await fetch(s);if(404===e.status)return[];const t=await e.json();return t.found&&t.results&&t.results.length>0?(console.log(`[UltimateSkip DEBUG] AniSkip segments found: ${t.results.length}`),t.results):[]}catch(e){return console.log("[UltimateSkip DEBUG] AniSkip Error:",e),[]}}(m,p));t.length>0?(a(s,t),f=s.playlist,k=c,y=p,S=t,f&&Array.isArray(f)&&f.forEach(((e,t)=>{const i=e.season||e.s||k,n=e.episode||e.e||e.episode_number||t+1;parseInt(n)===parseInt(y)&&parseInt(i)===parseInt(k)&&a(e,S)})),Lampa.Noty.show("Таймкоды загружены: Сезон "+c+", Серия "+p),window.Lampa.Player.listener&&window.Lampa.Player.listener.send("segments",{skip:s.segments.skip}),n("[Success] Found in AniSkip")):n("AniSkip returned no segments.")}else n("Jikan ID not found.")}else n("Not an Anime (Language/Genre mismatch). Skipping AniSkip.");var f,k,y,S}function o(){if(window.lampa_ultimate_skip)return;window.lampa_ultimate_skip=!0;const e=Lampa.Player.play;Lampa.Player.play=function(t){const i=this;Lampa.Loading.start((()=>{Lampa.Loading.stop(),e.call(i,t)})),s(t).then((()=>{Lampa.Loading.stop(),e.call(i,t)})).catch((n=>{console.error("[UltimateSkip] Critical Error:",n),Lampa.Loading.stop(),e.call(i,t)}))},console.log("[UltimateSkip] AniSkip Plugin Loaded")}window.Lampa&&window.Lampa.Player?o():window.document.addEventListener("app_ready",o)}();
+(function () {
+	"use strict";
+
+	const ANISKIP_API = "https://api.aniskip.com/v2/skip-times";
+	const JIKAN_API = "https://api.jikan.moe/v4/anime";
+	const SKIP_TYPES = ["op", "ed", "recap"];
+
+	function log(message, showNotify = false) {
+		console.log("[UltimateSkip]: " + message);
+		if (showNotify && typeof Lampa !== "undefined" && Lampa.Noty) {
+		}
+	}
+
+	function addSegmentsToItem(item, newSegments) {
+		if (!item || typeof item !== "object") return 0;
+
+		item.segments = item.segments || {};
+		item.segments.skip = item.segments.skip || [];
+
+		let count = 0;
+		newSegments.forEach((newSeg) => {
+			const exists = item.segments.skip.some((s) => s.start === newSeg.start);
+			if (!exists) {
+				item.segments.skip.push({
+					start: newSeg.start,
+					end: newSeg.end,
+					name: newSeg.name || "Пропустить",
+				});
+				count++;
+			}
+		});
+		return count;
+	}
+
+	function updatePlaylist(playlist, currentSeason, currentEpisode, segments) {
+		if (playlist && Array.isArray(playlist)) {
+			playlist.forEach((item, index) => {
+				const itemSeason = item.season || item.s || currentSeason;
+				const itemEpisode = item.episode || item.e || item.episode_number || index + 1;
+
+				if (parseInt(itemEpisode) === parseInt(currentEpisode) && parseInt(itemSeason) === parseInt(currentSeason)) {
+					addSegmentsToItem(item, segments);
+				}
+			});
+		}
+	}
+
+	async function searchAndApply(videoParams) {
+		let card = videoParams.movie || videoParams.card;
+		if (!card) {
+			const active = Lampa.Activity.active();
+			if (active) card = active.movie || active.card;
+		}
+		if (!card) return;
+
+		const kpId = card.kinopoisk_id || (card.source === "kinopoisk" ? card.id : null) || card.kp_id;
+
+		const position = (function (params, defaultSeason = 1) {
+			if (params.episode || params.e || params.episode_number) {
+				return {
+					season: parseInt(params.season || params.s || defaultSeason),
+					episode: parseInt(params.episode || params.e || params.episode_number),
+				};
+			}
+			if (params.playlist && Array.isArray(params.playlist)) {
+				const url = params.url;
+				const index = params.playlist.findIndex((p) => p.url && p.url === url);
+				if (index !== -1) {
+					const item = params.playlist[index];
+					return {
+						season: parseInt(item.season || item.s || defaultSeason),
+						episode: index + 1,
+					};
+				}
+			}
+			return { season: defaultSeason, episode: 1 };
+		})(videoParams, 1);
+
+		let episode = position.episode;
+		let season = position.season;
+
+		const isSerial = card.number_of_seasons > 0 || (card.original_name && !card.original_title);
+		if (!isSerial) {
+			season = 1;
+			episode = 1;
+		}
+
+		log(`Start search for: ${card.title} (S${season} E${episode}) [Method: calculated]`);
+		console.log("[UltimateSkip DEBUG] Search Params:", { kpId, season, episode, isSerial });
+
+		const lang = (card.original_language || "").toLowerCase();
+		const isAsian = lang === "ja" || lang === "zh" || lang === "cn";
+		const isAnimation = card.genres && card.genres.some((g) => g.id === 16 || (g.name && g.name.toLowerCase() === "animation"));
+
+		if (isAsian || isAnimation) {
+			log("Anime criteria matched. Trying AniSkip...");
+
+			let cleanName = card.original_name || card.original_title || card.name;
+			const searchTerm = cleanName
+				? cleanName
+						.replace(/\(\d{4}\)/g, "")
+						.replace(/\(TV\)/gi, "")
+						.replace(/Season \d+/gi, "")
+						.replace(/Part \d+/gi, "")
+						.replace(/[:\-]/g, " ")
+						.replace(/\s+/g, " ")
+						.trim()
+				: "";
+
+			console.log(`[UltimateSkip DEBUG] Cleaned title: "${searchTerm}"`);
+
+			const releaseYear = (card.release_date || card.first_air_date || "0000").slice(0, 4);
+
+			const malId = await (async function (title, seas, year) {
+				let query = title;
+				if (seas > 1) query += " Season " + seas;
+
+				const url = `${JIKAN_API}?q=${encodeURIComponent(query)}&limit=10`;
+				console.log("[UltimateSkip DEBUG] Jikan URL:", url);
+
+				try {
+					const response = await fetch(url);
+					const json = await response.json();
+
+					if (!json.data || json.data.length === 0) return null;
+
+					if (year && seas === 1) {
+						const match = json.data.find((item) => {
+							let y = item.year;
+							if (!y && item.aired && item.aired.from) y = item.aired.from.substring(0, 4);
+							return String(y) === String(year);
+						});
+						if (match) {
+							console.log(`[UltimateSkip DEBUG] Found by year (${year}): ${match.title} (ID: ${match.mal_id})`);
+							return match.mal_id;
+						}
+					}
+
+					if (seas > 1) {
+						const ordinal = seas + (seas % 10 === 1 && seas !== 11 ? "st" : seas % 10 === 2 && seas !== 12 ? "nd" : seas % 10 === 3 && seas !== 13 ? "rd" : "th");
+						const keywords = [`Season ${seas}`, `${ordinal} Season`, `Season${seas}`];
+
+						console.log("[UltimateSkip DEBUG] Checking titles for keywords:", keywords);
+
+						const titleMatch = json.data.find((item) => {
+							const titlesToCheck = [item.title, item.title_english, ...(item.title_synonyms || [])].filter(Boolean).map((t) => t.toLowerCase());
+
+							return titlesToCheck.some((t) => keywords.some((k) => t.includes(k.toLowerCase())));
+						});
+
+						if (titleMatch) {
+							console.log(`[UltimateSkip DEBUG] Found by title keywords: ${titleMatch.title} (ID: ${titleMatch.mal_id})`);
+							return titleMatch.mal_id;
+						}
+					}
+
+					console.log(`[UltimateSkip DEBUG] Fallback to first result: ${json.data[0].title} (ID: ${json.data[0].mal_id})`);
+					return json.data[0].mal_id;
+				} catch (e) {
+					log("Jikan Error: " + e.message);
+					return null;
+				}
+			})(searchTerm, season, releaseYear);
+
+			if (malId) {
+				console.log(`[UltimateSkip DEBUG] Selected MAL ID: ${malId}`);
+
+				const segmentsData = await (async function (id, ep) {
+					const types = SKIP_TYPES.map((t) => "types=" + t);
+					types.push("episodeLength=0");
+					const url = `${ANISKIP_API}/${id}/${ep}?${types.join("&")}`;
+					console.log("[UltimateSkip DEBUG] AniSkip URL:", url);
+
+					try {
+						const res = await fetch(url);
+						if (res.status === 404) return [];
+						const data = await res.json();
+						if (data.found && data.results && data.results.length > 0) {
+							console.log(`[UltimateSkip DEBUG] AniSkip segments found: ${data.results.length}`);
+							return data.results;
+						}
+						return [];
+					} catch (e) {
+						console.log("[UltimateSkip DEBUG] AniSkip Error:", e);
+						return [];
+					}
+				})(malId, episode);
+
+				const finalSegments = (function (rawSegments) {
+					if (!rawSegments || !rawSegments.length) return [];
+					const list = [];
+					rawSegments.forEach((s) => {
+						if (!s.interval) return;
+						const type = (s.skipType || s.skip_type || "").toLowerCase();
+						let name = "Пропустить";
+						if (type.includes("op")) name = "Опенинг";
+						else if (type.includes("ed")) name = "Эндинг";
+						else if (type === "recap") name = "Рекап";
+
+						const start = s.interval.startTime !== undefined ? s.interval.startTime : s.interval.start_time;
+						const end = s.interval.endTime !== undefined ? s.interval.endTime : s.interval.end_time;
+
+						if (start !== undefined && end !== undefined) {
+							list.push({ start, end, name });
+						}
+					});
+					return list;
+				})(segmentsData);
+
+				if (finalSegments.length > 0) {
+					addSegmentsToItem(videoParams, finalSegments);
+					updatePlaylist(videoParams.playlist, season, episode, finalSegments);
+
+					Lampa.Noty.show("Таймкоды загружены: Сезон " + season + ", Серия " + episode);
+
+					if (window.Lampa.Player.listener) {
+						window.Lampa.Player.listener.send("segments", { skip: videoParams.segments.skip });
+					}
+					log("[Success] Found in AniSkip");
+				} else {
+					log("AniSkip returned no segments.");
+				}
+			} else {
+				log("Jikan ID not found.");
+			}
+		} else {
+			log("Not an Anime (Language/Genre mismatch). Skipping AniSkip.");
+		}
+	}
+
+	function init() {
+		if (window.lampa_ultimate_skip) return;
+		window.lampa_ultimate_skip = true;
+
+		const originalPlay = Lampa.Player.play;
+
+		Lampa.Player.play = function (videoParams) {
+			const context = this;
+			Lampa.Loading.start(() => {
+				Lampa.Loading.stop();
+				originalPlay.call(context, videoParams);
+			});
+
+			searchAndApply(videoParams)
+				.then(() => {
+					Lampa.Loading.stop();
+					originalPlay.call(context, videoParams);
+				})
+				.catch((e) => {
+					console.error("[UltimateSkip] Critical Error:", e);
+					Lampa.Loading.stop();
+					originalPlay.call(context, videoParams);
+				});
+		};
+		console.log("[UltimateSkip] AniSkip Plugin Loaded");
+	}
+
+	if (window.Lampa && window.Lampa.Player) {
+		init();
+	} else {
+		window.document.addEventListener("app_ready", init);
+	}
+})();
