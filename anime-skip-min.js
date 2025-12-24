@@ -5,12 +5,6 @@
 	const JIKAN_API = "https://api.jikan.moe/v4/anime";
 	const SKIP_TYPES = ["op", "ed", "recap"];
 
-	function log(message, showNotify = false) {
-		console.log("[UltimateSkip]: " + message);
-		if (showNotify && typeof Lampa !== "undefined" && Lampa.Noty) {
-		}
-	}
-
 	function addSegmentsToItem(item, newSegments) {
 		if (!item || typeof item !== "object") return 0;
 
@@ -53,6 +47,14 @@
 		}
 		if (!card) return;
 
+		const title = videoParams.title || card.title || card.name || "";
+		const trailerKeywords = ["трейлер", "trailer", "тизер", "teaser"];
+		const isTrailerTitle = trailerKeywords.some((k) => title.toLowerCase().includes(k));
+
+		if (isTrailerTitle) {
+			return;
+		}
+
 		const kpId = card.kinopoisk_id || (card.source === "kinopoisk" ? card.id : null) || card.kp_id;
 
 		const position = (function (params, defaultSeason = 1) {
@@ -85,9 +87,6 @@
 			episode = 1;
 		}
 
-		log(`Start search for: ${card.title} (S${season} E${episode}) [Method: calculated]`);
-		console.log("[UltimateSkip DEBUG] Search Params:", { kpId, season, episode, isSerial });
-
 		const lang = (card.original_language || "").toLowerCase();
 		const isAsian = lang === "ja" || lang === "zh" || lang === "cn";
 		const isAnimation = card.genres && card.genres.some((g) => g.id === 16 || (g.name && g.name.toLowerCase() === "animation"));
@@ -107,8 +106,6 @@
 						.trim()
 				: "";
 
-			console.log(`[UltimateSkip DEBUG] Cleaned title: "${searchTerm}"`);
-
 			const releaseYear = (card.release_date || card.first_air_date || "0000").slice(0, 4);
 
 			const malId = await (async function (title, seas, year) {
@@ -116,7 +113,6 @@
 				if (seas > 1) query += " Season " + seas;
 
 				const url = `${JIKAN_API}?q=${encodeURIComponent(query)}&limit=10`;
-				console.log("[UltimateSkip DEBUG] Jikan URL:", url);
 
 				try {
 					const response = await fetch(url);
@@ -131,7 +127,6 @@
 							return String(y) === String(year);
 						});
 						if (match) {
-							console.log(`[UltimateSkip DEBUG] Found by year (${year}): ${match.title} (ID: ${match.mal_id})`);
 							return match.mal_id;
 						}
 					}
@@ -140,8 +135,6 @@
 						const ordinal = seas + (seas % 10 === 1 && seas !== 11 ? "st" : seas % 10 === 2 && seas !== 12 ? "nd" : seas % 10 === 3 && seas !== 13 ? "rd" : "th");
 						const keywords = [`Season ${seas}`, `${ordinal} Season`, `Season${seas}`];
 
-						console.log("[UltimateSkip DEBUG] Checking titles for keywords:", keywords);
-
 						const titleMatch = json.data.find((item) => {
 							const titlesToCheck = [item.title, item.title_english, ...(item.title_synonyms || [])].filter(Boolean).map((t) => t.toLowerCase());
 
@@ -149,39 +142,32 @@
 						});
 
 						if (titleMatch) {
-							console.log(`[UltimateSkip DEBUG] Found by title keywords: ${titleMatch.title} (ID: ${titleMatch.mal_id})`);
 							return titleMatch.mal_id;
 						}
 					}
 
-					console.log(`[UltimateSkip DEBUG] Fallback to first result: ${json.data[0].title} (ID: ${json.data[0].mal_id})`);
+
 					return json.data[0].mal_id;
 				} catch (e) {
-					log("Jikan Error: " + e.message);
 					return null;
 				}
 			})(searchTerm, season, releaseYear);
 
 			if (malId) {
-				console.log(`[UltimateSkip DEBUG] Selected MAL ID: ${malId}`);
-
 				const segmentsData = await (async function (id, ep) {
 					const types = SKIP_TYPES.map((t) => "types=" + t);
 					types.push("episodeLength=0");
 					const url = `${ANISKIP_API}/${id}/${ep}?${types.join("&")}`;
-					console.log("[UltimateSkip DEBUG] AniSkip URL:", url);
 
 					try {
 						const res = await fetch(url);
 						if (res.status === 404) return [];
 						const data = await res.json();
 						if (data.found && data.results && data.results.length > 0) {
-							console.log(`[UltimateSkip DEBUG] AniSkip segments found: ${data.results.length}`);
 							return data.results;
 						}
 						return [];
 					} catch (e) {
-						console.log("[UltimateSkip DEBUG] AniSkip Error:", e);
 						return [];
 					}
 				})(malId, episode);
@@ -216,15 +202,8 @@
 					if (window.Lampa.Player.listener) {
 						window.Lampa.Player.listener.send("segments", { skip: videoParams.segments.skip });
 					}
-					log("[Success] Found in AniSkip");
-				} else {
-					log("AniSkip returned no segments.");
 				}
-			} else {
-				log("Jikan ID not found.");
 			}
-		} else {
-			log("Not an Anime (Language/Genre mismatch). Skipping AniSkip.");
 		}
 	}
 
@@ -247,12 +226,10 @@
 					originalPlay.call(context, videoParams);
 				})
 				.catch((e) => {
-					console.error("[UltimateSkip] Critical Error:", e);
 					Lampa.Loading.stop();
 					originalPlay.call(context, videoParams);
 				});
 		};
-		console.log("[UltimateSkip] AniSkip Plugin Loaded");
 	}
 
 	if (window.Lampa && window.Lampa.Player) {
