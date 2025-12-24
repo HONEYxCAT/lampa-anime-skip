@@ -92,8 +92,6 @@
 		const isAnimation = card.genres && card.genres.some((g) => g.id === 16 || (g.name && g.name.toLowerCase() === "animation"));
 
 		if (isAsian || isAnimation) {
-			log("Anime criteria matched. Trying AniSkip...");
-
 			let cleanName = card.original_name || card.original_title || card.name;
 			const searchTerm = cleanName
 				? cleanName
