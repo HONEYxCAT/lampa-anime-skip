@@ -192,14 +192,20 @@
 				})(segmentsData);
 
 				if (finalSegments.length > 0) {
-					addSegmentsToItem(videoParams, finalSegments);
+					videoParams.segments = videoParams.segments || {};
+					videoParams.segments.skip = videoParams.segments.skip || [];
+
+					finalSegments.forEach(function(seg) {
+						var exists = videoParams.segments.skip.some(function(s) {
+							return s.start === seg.start;
+						});
+						if (!exists) {
+							videoParams.segments.skip.push(seg);
+						}
+					});
+
 					updatePlaylist(videoParams.playlist, season, episode, finalSegments);
-
 					Lampa.Noty.show("Таймкоды загружены: Сезон " + season + ", Серия " + episode);
-
-					if (window.Lampa.Player.listener) {
-						window.Lampa.Player.listener.send("segments", { skip: videoParams.segments.skip });
-					}
 				}
 			}
 		}
@@ -210,24 +216,77 @@
 		window.lampa_ultimate_skip = true;
 
 		const originalPlay = Lampa.Player.play;
+		const originalPlaylist = Lampa.Player.playlist;
+		let pendingPlaylist = null;
+
+		console.log('[AnimeSkip] init - перехват Player.play установлен');
+
+		Lampa.Player.playlist = function(playlist) {
+			console.log('[AnimeSkip] Player.playlist вызван, length:', playlist ? playlist.length : 0);
+			pendingPlaylist = playlist;
+			originalPlaylist.call(this, playlist);
+		};
 
 		Lampa.Player.play = function (videoParams) {
 			const context = this;
-			Lampa.Loading.start(() => {
-				Lampa.Loading.stop();
-				originalPlay.call(context, videoParams);
-			});
+
+			console.log('[AnimeSkip] Player.play вызван');
+			console.log('[AnimeSkip] videoParams.url:', videoParams.url);
+			console.log('[AnimeSkip] videoParams.title:', videoParams.title);
+			console.log('[AnimeSkip] videoParams.playlist length:', videoParams.playlist ? videoParams.playlist.length : 'нет плейлиста');
+
+			const currentPlaylist = Lampa.PlayerPlaylist.get();
+			const currentPosition = Lampa.PlayerPlaylist.position();
+			console.log('[AnimeSkip] PlayerPlaylist.get() length:', currentPlaylist.length);
+			console.log('[AnimeSkip] PlayerPlaylist.position():', currentPosition);
+
+			if (videoParams.url) {
+				console.log('[AnimeSkip] Устанавливаем PlayerPlaylist.url:', videoParams.url);
+				Lampa.PlayerPlaylist.url(videoParams.url);
+			}
+
+			if (videoParams.playlist && videoParams.playlist.length > 0) {
+				console.log('[AnimeSkip] Устанавливаем плейлист из videoParams');
+				Lampa.PlayerPlaylist.set(videoParams.playlist);
+			}
+
+			console.log('[AnimeSkip] Запускаем searchAndApply...');
+			const startTime = Date.now();
 
 			searchAndApply(videoParams)
 				.then(() => {
-					Lampa.Loading.stop();
+					console.log('[AnimeSkip] searchAndApply завершён за', Date.now() - startTime, 'мс');
+					console.log('[AnimeSkip] videoParams.segments после searchAndApply:', JSON.stringify(videoParams.segments));
+					console.log('[AnimeSkip] Вызываем originalPlay...');
+
+					const playlistAfter = Lampa.PlayerPlaylist.get();
+					const positionAfter = Lampa.PlayerPlaylist.position();
+					console.log('[AnimeSkip] PlayerPlaylist.get() length перед originalPlay:', playlistAfter.length);
+					console.log('[AnimeSkip] PlayerPlaylist.position() перед originalPlay:', positionAfter);
+
 					originalPlay.call(context, videoParams);
+
+					console.log('[AnimeSkip] originalPlay вызван');
+
+					if (pendingPlaylist) {
+						console.log('[AnimeSkip] Применяем pendingPlaylist:', pendingPlaylist.length);
+						Lampa.PlayerPlaylist.set(pendingPlaylist);
+						pendingPlaylist = null;
+					}
 				})
 				.catch((e) => {
-					Lampa.Loading.stop();
+					console.log('[AnimeSkip] searchAndApply ошибка:', e);
 					originalPlay.call(context, videoParams);
 				});
 		};
+
+		Lampa.PlayerPlaylist.listener.follow('select', function(e) {
+			console.log('[AnimeSkip] PlayerPlaylist select event');
+			console.log('[AnimeSkip] e.item.url:', e.item.url);
+			console.log('[AnimeSkip] e.item.title:', e.item.title);
+			console.log('[AnimeSkip] e.position:', e.position);
+			console.log('[AnimeSkip] typeof e.item.url:', typeof e.item.url);
+		});
 	}
 
 	if (window.Lampa && window.Lampa.Player) {
