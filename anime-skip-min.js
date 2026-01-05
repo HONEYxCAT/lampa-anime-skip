@@ -5,27 +5,6 @@
 	const JIKAN_API = "https://api.jikan.moe/v4/anime";
 	const SKIP_TYPES = ["op", "ed", "recap"];
 
-	function addSegmentsToItem(item, newSegments) {
-		if (!item || typeof item !== "object") return 0;
-
-		item.segments = item.segments || {};
-		item.segments.skip = item.segments.skip || [];
-
-		let count = 0;
-		newSegments.forEach((newSeg) => {
-			const exists = item.segments.skip.some((s) => s.start === newSeg.start);
-			if (!exists) {
-				item.segments.skip.push({
-					start: newSeg.start,
-					end: newSeg.end,
-					name: newSeg.name || "Пропустить",
-				});
-				count++;
-			}
-		});
-		return count;
-	}
-
 	function updatePlaylist(playlist, currentSeason, currentEpisode, segments) {
 		if (playlist && Array.isArray(playlist)) {
 			playlist.forEach((item, index) => {
@@ -33,7 +12,8 @@
 				const itemEpisode = item.episode || item.e || item.episode_number || index + 1;
 
 				if (parseInt(itemEpisode) === parseInt(currentEpisode) && parseInt(itemSeason) === parseInt(currentSeason)) {
-					addSegmentsToItem(item, segments);
+					item.segments = item.segments || {};
+					item.segments.skip = segments.slice();
 				}
 			});
 		}
@@ -192,16 +172,7 @@
 
 				if (finalSegments.length > 0) {
 					videoParams.segments = videoParams.segments || {};
-					videoParams.segments.skip = videoParams.segments.skip || [];
-
-					finalSegments.forEach(function (seg) {
-						var exists = videoParams.segments.skip.some(function (s) {
-							return s.start === seg.start;
-						});
-						if (!exists) {
-							videoParams.segments.skip.push(seg);
-						}
-					});
+					videoParams.segments.skip = finalSegments.slice();
 
 					updatePlaylist(videoParams.playlist, season, episode, finalSegments);
 					Lampa.Noty.show("Таймкоды загружены: Сезон " + season + ", Серия " + episode);
