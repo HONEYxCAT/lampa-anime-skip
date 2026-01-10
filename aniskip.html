@@ -2933,6 +2933,9 @@
 					$("resultTitle").innerText = `Результат Ep ${epNum}`;
 					$("codeLabel").innerText = `Эпизод ${epNum}`;
 
+					const collapseBtn = $("collapseBtn");
+					if (collapseBtn) collapseBtn.classList.remove("visible");
+
 					const copyBtn = $("copyResultBtn");
 					if (copyBtn) copyBtn.style.visibility = "hidden";
 
