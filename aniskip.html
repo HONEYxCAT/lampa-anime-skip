@@ -2316,7 +2316,7 @@
 			<div class="separator" style="margin: 0.5rem 0"></div>
 
 			<div class="form-group">
-				<label>MAL ID</label>
+				<label>MyAnimeList ID</label>
 				<input type="number" id="malId" value="52991" placeholder="Anime ID" />
 			</div>
 
@@ -2402,9 +2402,9 @@
 				<button class="btn btn-primary" type="button" data-action="fetch-season">Загрузить диапазон</button>
 			</div>
 
-			<div class="separator"></div>
+			<div class="separator" id="batchSeparator"></div>
 
-			<div>
+			<div id="batchSection">
 				<div class="section-title">Пакетная обработка</div>
 				<div class="grid-2">
 					<button class="btn btn-outline" type="button" data-action="import-json">
@@ -2630,6 +2630,7 @@
 		(() => {
 			const ANISKIP_BASE = "https://api.aniskip.com/v2/skip-times";
 			const ANISKIP_VOTE_BASE = "https://api.aniskip.com/v2/skip-times/vote";
+			const SHOW_BATCH_PROCESSING = false;
 
 			const $ = (id) => document.getElementById(id);
 
@@ -4476,6 +4477,14 @@
 						}, 100);
 					}
 				});
+			})();
+			(function initBatchVisibility() {
+				if (!SHOW_BATCH_PROCESSING) {
+					const sep = $("batchSeparator");
+					const sec = $("batchSection");
+					if (sep) sep.style.display = "none";
+					if (sec) sec.style.display = "none";
+				}
 			})();
 			(function initDragScroll() {
 				const slider = document.getElementById("gridContainer");
