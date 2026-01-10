@@ -2639,6 +2639,7 @@
 			/** Единое состояние приложения */
 			const AppState = {
 				realEpisodeDuration: 1440,
+				jikanDuration: 1440,
 				timeInputMode: localStorage.getItem("aniskip_time_mode") || "min-sec",
 				selectedSkipType: "op",
 				smartIntervals: {},
@@ -2676,14 +2677,18 @@
 
 			/** Сервис общения с API */
 			const ApiService = {
-				/** Поиск аниме через Jikan */
 				searchAnime: async (query) => {
 					const res = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(query)}&limit=5`);
 					const json = await res.json();
 					return json.data || [];
 				},
 
-				/** Получение skip times */
+				getAnimeById: async (malId) => {
+					const res = await fetch(`https://api.jikan.moe/v4/anime/${malId}`);
+					const json = await res.json();
+					return json.data || null;
+				},
+
 				getSkipTimes: async (malId, ep, types, episodeLength) => {
 					const params = new URLSearchParams();
 					(types || []).forEach((t) => params.append("types", t));
@@ -2931,8 +2936,13 @@
 					if (copyBtn) copyBtn.style.visibility = "hidden";
 
 					if (data.found && data.results && data.results.length > 0) {
+						const firstWithLength = data.results.find(r => r.episodeLength && r.episodeLength > 0);
+						if (firstWithLength) {
+							AppState.realEpisodeDuration = firstWithLength.episodeLength;
+						}
 						renderSkipCards(data.results, epNum);
 					} else {
+						AppState.realEpisodeDuration = AppState.jikanDuration;
 						codeOut.innerHTML = `
 							<div class="tabs">
 								<button class="tab active" type="button" data-tab="editor">Добавить</button>
@@ -2984,7 +2994,7 @@
 						Длительность: ${TimeUtils.fmt(skip.interval.endTime - skip.interval.startTime)} •
 						Длительность эпизода: ${TimeUtils.fmt(skip.episodeLength)}
 					</div>
-					<div class="vote-container">
+					${skip._isNew ? '' : `<div class="vote-container">
 						<button class="vote-btn upvote" type="button" data-action="vote" data-vote-type="upvote" data-skip-id="${skip.skipId}">
 							<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-upvote"></use></svg>
 							Полезно
@@ -2993,7 +3003,7 @@
 							<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-downvote"></use></svg>
 							Неточно
 						</button>
-					</div>
+					</div>`}
 				</div>`;
 				});
 
@@ -3815,6 +3825,17 @@
 				}
 				if (end < start) return;
 
+				try {
+					const animeData = await ApiService.getAnimeById(malId);
+					if (animeData) {
+						const dur = TimeUtils.parseDuration(animeData.duration);
+						if (dur > 0) {
+							AppState.jikanDuration = dur;
+							AppState.realEpisodeDuration = dur;
+						}
+					}
+				} catch (e) {}
+
 				$("resultTitle").innerText = `Сезон (${start} - ${end})`;
 				$("codeOutput").innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-grid"></use></svg><p>Выберите эпизод для просмотра деталей</p></div>';
 
@@ -3862,6 +3883,12 @@
 							const d = s.interval.endTime - s.interval.startTime;
 							if (!typeDurs[t]) typeDurs[t] = [];
 							typeDurs[t].push(d);
+							if (s.episodeLength && s.episodeLength > 0) {
+								AppState.realEpisodeDuration = s.episodeLength;
+								if (AppState.jikanDuration === 1440) {
+									AppState.jikanDuration = s.episodeLength;
+								}
+							}
 						});
 					}
 				});
@@ -4187,7 +4214,10 @@
 					const dur = parseInt(searchItem.dataset.duration || "0", 10) || 0;
 					const eps = parseInt(searchItem.dataset.episodes || "0", 10) || 0;
 					if (malId) $("malId").value = malId;
-					AppState.realEpisodeDuration = dur || 1440;
+					if (dur > 0) {
+						AppState.jikanDuration = dur;
+						AppState.realEpisodeDuration = dur;
+					}
 					if (eps) $("seasonEnd").value = eps;
 					$("searchResults").classList.remove("active");
 					return;
@@ -4211,8 +4241,13 @@
 					if (copyBtn) copyBtn.style.visibility = "hidden";
 
 					if (res.data && res.data.results && res.data.results.length > 0) {
+						const firstWithLength = res.data.results.find(r => r.episodeLength && r.episodeLength > 0);
+						if (firstWithLength) {
+							AppState.realEpisodeDuration = firstWithLength.episodeLength;
+						}
 						renderSkipCards(res.data.results, ep);
 					} else {
+						AppState.realEpisodeDuration = AppState.jikanDuration;
 						$("codeOutput").innerHTML = `
 								<div class="tabs">
 									<button class="tab active" type="button" data-tab="editor">Добавить</button>
