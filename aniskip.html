@@ -2936,13 +2936,8 @@
 					if (copyBtn) copyBtn.style.visibility = "hidden";
 
 					if (data.found && data.results && data.results.length > 0) {
-						const firstWithLength = data.results.find(r => r.episodeLength && r.episodeLength > 0);
-						if (firstWithLength) {
-							AppState.realEpisodeDuration = firstWithLength.episodeLength;
-						}
 						renderSkipCards(data.results, epNum);
 					} else {
-						AppState.realEpisodeDuration = AppState.jikanDuration;
 						codeOut.innerHTML = `
 							<div class="tabs">
 								<button class="tab active" type="button" data-tab="editor">Добавить</button>
@@ -3830,8 +3825,9 @@
 					if (animeData) {
 						const dur = TimeUtils.parseDuration(animeData.duration);
 						if (dur > 0) {
-							AppState.jikanDuration = dur;
-							AppState.realEpisodeDuration = dur;
+							const roundedUp = Math.ceil(dur / 60) * 60 + 60;
+							AppState.jikanDuration = roundedUp;
+							AppState.realEpisodeDuration = roundedUp;
 						}
 					}
 				} catch (e) {}
@@ -3874,6 +3870,7 @@
 				AppState.smartIntervals = {};
 				AppState.seasonResults = new Map();
 				const typeDurs = {};
+				let maxEpisodeLength = 0;
 
 				results.forEach((r) => {
 					AppState.seasonResults.set(r.ep, r);
@@ -3883,15 +3880,22 @@
 							const d = s.interval.endTime - s.interval.startTime;
 							if (!typeDurs[t]) typeDurs[t] = [];
 							typeDurs[t].push(d);
-							if (s.episodeLength && s.episodeLength > 0) {
-								AppState.realEpisodeDuration = s.episodeLength;
-								if (AppState.jikanDuration === 1440) {
-									AppState.jikanDuration = s.episodeLength;
-								}
+							if (s.episodeLength && s.episodeLength > 0 && s.episodeLength > maxEpisodeLength) {
+								maxEpisodeLength = s.episodeLength;
 							}
 						});
 					}
 				});
+
+				if (maxEpisodeLength > 0) {
+					const roundedUp = Math.ceil(maxEpisodeLength / 60) * 60 + 60;
+					AppState.realEpisodeDuration = roundedUp;
+					AppState.jikanDuration = roundedUp;
+				} else if (AppState.jikanDuration > 0 && AppState.jikanDuration !== 1440) {
+					const roundedUp = Math.ceil(AppState.jikanDuration / 60) * 60 + 60;
+					AppState.realEpisodeDuration = roundedUp;
+					AppState.jikanDuration = roundedUp;
+				}
 
 				Object.keys(typeDurs).forEach((t) => {
 					if (typeDurs[t].length >= 2) {
@@ -4241,13 +4245,8 @@
 					if (copyBtn) copyBtn.style.visibility = "hidden";
 
 					if (res.data && res.data.results && res.data.results.length > 0) {
-						const firstWithLength = res.data.results.find(r => r.episodeLength && r.episodeLength > 0);
-						if (firstWithLength) {
-							AppState.realEpisodeDuration = firstWithLength.episodeLength;
-						}
 						renderSkipCards(res.data.results, ep);
 					} else {
-						AppState.realEpisodeDuration = AppState.jikanDuration;
 						$("codeOutput").innerHTML = `
 								<div class="tabs">
 									<button class="tab active" type="button" data-tab="editor">Добавить</button>
